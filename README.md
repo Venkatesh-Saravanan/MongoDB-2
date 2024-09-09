@@ -1,0 +1,254 @@
+### MongoDB Database Design  for Zen Class Program
+
+#### **1. Overview**
+This document outlines the MongoDB database design for managing the Zen Class program, which includes users, codekata, attendance, topics, tasks, company drives, and mentors. The design includes the schema definitions for each collection and the queries to retrieve specific information as requested.
+
+
+### **2. Collections and Schema Definitions**
+
+#### **2.1 Users Collection**
+**Purpose**: Stores information about users (students) participating in the Zen Class program.
+
+**Schema**:
+```json
+{
+    "_id": ObjectId,           // Unique identifier for each user
+    "name": String,            // Name of the user
+    "email": String,           // Email of the user
+    "batch": String,           // Batch the user belongs to
+    "mentor_id": ObjectId,     // Reference to the mentor assigned to the user
+    "codekata": [              // Array of codekata problems attempted by the user
+        {
+            "problem_id": ObjectId,  // Reference to the codekata problem
+            "status": String,        // Status of the problem (e.g., "Solved", "Unsolved")
+            "solved_date": Date      // Date when the problem was solved
+        }
+    ],
+    "attendance": [            // Array of attendance records for the user
+        {
+            "date": Date,            // Date of attendance
+            "status": String         // Status of attendance (e.g., "Present", "Absent")
+        }
+    ],
+    "tasks": [                 // Array of tasks assigned to the user
+        {
+            "task_id": ObjectId,     // Reference to the task
+            "submission_status": String, // Status of task submission (e.g., "Submitted", "Not Submitted")
+            "submission_date": Date  // Date when the task was submitted
+        }
+    ]
+}
+```
+
+#### **2.2 Codekata Collection**
+**Purpose**: Stores information about codekata problems available to the users.
+
+**Schema**:
+```json
+{
+    "_id": ObjectId,       // Unique identifier for each codekata problem
+    "problem_name": String, // Name of the codekata problem
+    "difficulty": String    // Difficulty level of the problem (e.g., "Easy", "Medium", "Hard")
+}
+```
+
+#### **2.3 Attendance Collection**
+**Purpose**: Records the attendance of users in the Zen Class program.
+
+**Schema**:
+```json
+{
+    "_id": ObjectId,       // Unique identifier for each attendance record
+    "user_id": ObjectId,   // Reference to the user
+    "date": Date,          // Date of attendance
+    "status": String       // Status of attendance (e.g., "Present", "Absent")
+}
+```
+
+#### **2.4 Topics Collection**
+**Purpose**: Stores information about topics covered in the Zen Class program.
+
+**Schema**:
+```json
+{
+    "_id": ObjectId,       // Unique identifier for each topic
+    "topic_name": String,  // Name of the topic
+    "date_covered": Date,  // Date when the topic was covered
+    "batch": String        // Batch for which the topic was covered
+}
+```
+
+#### **2.5 Tasks Collection**
+**Purpose**: Stores information about tasks assigned to users in the Zen Class program.
+
+**Schema**:
+```json
+{
+    "_id": ObjectId,       // Unique identifier for each task
+    "task_name": String,   // Name of the task
+    "assigned_date": Date, // Date when the task was assigned
+    "due_date": Date,      // Due date for the task
+    "batch": String        // Batch for which the task was assigned
+}
+```
+
+#### **2.6 Company Drives Collection**
+**Purpose**: Stores information about company drives conducted for placement.
+
+**Schema**:
+```json
+{
+    "_id": ObjectId,       // Unique identifier for each company drive
+    "company_name": String, // Name of the company
+    "date": Date,          // Date of the company drive
+    "students_attended": [ObjectId] // Array of user IDs who attended the drive
+}
+```
+
+#### **2.7 Mentors Collection**
+**Purpose**: Stores information about mentors and the users they are mentoring.
+
+**Schema**:
+```json
+{
+    "_id": ObjectId,       // Unique identifier for each mentor
+    "mentor_name": String,  // Name of the mentor
+    "batch": String,        // Batch the mentor is responsible for
+    "mentees": [ObjectId]   // Array of user IDs who are being mentored by this mentor
+}
+```
+
+---
+
+### **3. Queries**
+
+#### **3.1 Find All Topics and Tasks Taught in October**
+
+This query retrieves all topics and tasks that were covered or assigned in the month of October.
+
+**Topics**:
+```javascript
+db.topics.find({
+    "date_covered": {
+        $gte: ISODate("2023-10-01T00:00:00Z"),
+        $lt: ISODate("2023-11-01T00:00:00Z")
+    }
+});
+```
+
+**Tasks**:
+```javascript
+db.tasks.find({
+    "assigned_date": {
+        $gte: ISODate("2023-10-01T00:00:00Z"),
+        $lt: ISODate("2023-11-01T00:00:00Z")
+    }
+});
+```
+
+#### **3.2 Find All Company Drives Between 15 Oct 2020 and 31 Oct 2020**
+
+This query retrieves all company drives that occurred between 15th October 2020 and 31st October 2020.
+
+```javascript
+db.company_drives.find({
+    "date": {
+        $gte: ISODate("2020-10-15T00:00:00Z"),
+        $lt: ISODate("2020-11-01T00:00:00Z")
+    }
+});
+```
+
+#### **3.3 Find All Company Drives and Students Who Appeared for Placement**
+
+This query retrieves all company drives along with the list of students who attended each drive.
+
+```javascript
+db.company_drives.aggregate([
+    {
+        $lookup: {
+            from: "users",
+            localField: "students_attended",
+            foreignField: "_id",
+            as: "students"
+        }
+    },
+    {
+        $project: {
+            "company_name": 1,
+            "date": 1,
+            "students.name": 1,
+            "students.email": 1
+        }
+    }
+]);
+```
+
+#### **3.4 Find the Number of Problems Solved by Each User in Codekata**
+
+This query retrieves the number of codekata problems solved by each user.
+
+```javascript
+db.users.aggregate([
+    {
+        $project: {
+            "name": 1,
+            "problems_solved": {
+                $size: {
+                    $filter: {
+                        input: "$codekata",
+                        as: "kata",
+                        cond: { $eq: ["$$kata.status", "Solved"] }
+                    }
+                }
+            }
+        }
+    }
+]);
+```
+
+#### **3.5 Find All Mentors with Mentee Count Greater Than 15**
+
+This query retrieves mentors who have more than 15 mentees.
+
+```javascript
+db.mentors.find({
+    $expr: { $gt: [{ $size: "$mentees" }, 15] }
+});
+```
+
+#### **3.6 Find the Number of Users Who Were Absent and Did Not Submit Tasks Between 15 Oct 2020 and 31 Oct 2020**
+
+This query retrieves the number of users who were marked as absent and did not submit their tasks between 15th October 2020 and 31st October 2020.
+
+```javascript
+db.users.aggregate([
+    {
+        $match: {
+            $and: [
+                {
+                    "attendance.date": {
+                        $gte: ISODate("2020-10-15T00:00:00Z"),
+                        $lt: ISODate("2020-11-01T00:00:00Z")
+                    }
+                },
+                { "attendance.status": "Absent" },
+                {
+                    "tasks.submission_date": {
+                        $exists: false
+                    }
+                }
+            ]
+        }
+    },
+    {
+        $count: "absent_and_not_submitted"
+    }
+]);
+```
+
+---
+
+### **4. Summary**
+
+This document provides a detailed overview of the MongoDB database schema for the Zen Class program and the queries required to extract specific information from the database. The schema is designed to efficiently manage and retrieve data related to users, codekata, attendance, topics, tasks, company drives, and mentors. By following this design, you can ensure that the database structure is robust and scalable for future requirements.
